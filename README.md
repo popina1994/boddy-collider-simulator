@@ -1,2 +1,2 @@
-# The Mandlebrot Set
+# Simulation of Physics
 
