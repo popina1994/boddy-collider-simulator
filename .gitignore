@@ -1,0 +1,7 @@
+.vs/
+*.vcxproj
+*.tlog
+First/x64/Debug/
+*.filters
+*.sln
+First/log_w.txt
