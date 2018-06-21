@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using Assets.Scripts;
+using UnityEditor;
 using UnityEngine;
 
 public class MeshFragmenter : MonoBehaviour
@@ -21,13 +23,24 @@ public class MeshFragmenter : MonoBehaviour
 
     private static Vector3 IntersectionSegmentPlane(Plane plane, Vector3 point1, Vector3 point2)
     {
-        Ray ray = new Ray(point1, point2);
-        float intersectionDistance;
-        plane.Raycast(ray, out intersectionDistance);
-        return  ray.GetPoint(intersectionDistance);
+        float length;
+        float dotNumerator;
+        float dotDenominator;
+        Vector3 intersection;
+        Vector3 lineVec = point2 - point1;
+        Vector3 linePoint = point1;
+        Vector3 planePoint = plane.ClosestPointOnPlane(new Vector3(0, 0, 0));
+
+        dotNumerator = Vector3.Dot((planePoint - linePoint), plane.normal);
+        dotDenominator = Vector3.Dot(lineVec, plane.normal);
+
+        length = dotNumerator / dotDenominator;
+        intersection = linePoint + lineVec * length;
+
+        return intersection;
     }
 
-    private static LinkedList<Mesh> SliceMesh(Plane plane, Mesh mesh)
+    private static Mesh[] SliceMesh(Plane plane, Mesh mesh)
     {
         Vector3[] meshVertices = mesh.vertices;
         MeshBuilder[] meshBuilders = new MeshBuilder[NUM_SIDES];
@@ -51,6 +64,7 @@ public class MeshFragmenter : MonoBehaviour
             if ((isPositive[0] == isPositive[1]) && (isPositive[1] == isPositive[2]))
             {
                 idxSide = isPositive[0] ? POSITIVE : NEGATIVE;
+                Debug.Log(isPositive[0] ? "Positive" : "Negative");
                 meshBuilders[idxSide].AddTriangle(points[0], points[1], points[2]);
             }
             else
@@ -62,7 +76,7 @@ public class MeshFragmenter : MonoBehaviour
                 {
                     idxPrev = (idxPoint + 2) % NUM_POINTS;
                     idxNext = (idxPoint + 1) % NUM_POINTS;
-                    if ((points[idxPoint] != points[idxPrev]) && (points[idxPoint] != points[idxNext]))
+                    if ((isPositive[idxPoint] != isPositive[idxPrev]) && (isPositive[idxPoint] != isPositive[idxNext]))
                     {
                         idxSide = isPositive[idxPoint] ? POSITIVE : NEGATIVE;
                         idxPointOnOtherSide = idxPoint;
@@ -72,17 +86,22 @@ public class MeshFragmenter : MonoBehaviour
                 Vector3 intersectionPoint1 = IntersectionSegmentPlane(plane, points[idxNext], points[idxPointOnOtherSide]);
                 Vector3 intersectionPoint2 = IntersectionSegmentPlane(plane, points[idxPrev], points[idxPointOnOtherSide]);
 
-                // Triangle from the other side. 
+                // Triangle whose only point from the bigger one is added.
+                Debug.Log("Cutting of a triangle");
+                Debug.Log(isPositive[idxPointOnOtherSide] ? "Positive" : "Negative");
                 meshBuilders[idxSide].AddTriangle(points[idxPointOnOtherSide], intersectionPoint1, intersectionPoint2);
                 int idxOtherSide = (idxSide + 1) % NUM_SIDES;
+                Debug.Log(isPositive[idxNext] ? "Positive" : "Negative");
                 meshBuilders[idxOtherSide].AddTriangle(points[idxNext], intersectionPoint1, intersectionPoint2);
-                meshBuilders[idxOtherSide].AddTriangle(points[idxPrev], intersectionPoint1, intersectionPoint2);
+                Debug.Log(isPositive[idxPrev] ? "Positive" : "Negative");
+                meshBuilders[idxOtherSide].AddTriangle(points[idxPrev], points[idxNext], intersectionPoint2);
             }
         }
-        LinkedList<Mesh> meshBuild = new LinkedList<Mesh>();
+        Mesh[] meshBuild = new Mesh[NUM_SIDES];
         for (int idx = 0; idx < NUM_SIDES; idx++)
         {
-            meshBuild.AddLast(meshBuilders[idx].Build());
+            Debug.Log(idx);
+            meshBuild[idx] = meshBuilders[idx].Build();
         }
         return meshBuild;
     }
@@ -96,9 +115,13 @@ public class MeshFragmenter : MonoBehaviour
         //
         Plane planeCenter = new Plane(center, random1, random2);
 
-        LinkedList<Mesh> slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
+        Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
         // TODO: Add multiple fragments generation. 
         //
+        meshTreeNode.Left = new MeshTreeNode(slicedMeshResults[POSITIVE]);
+        meshTreeNode.Right = new MeshTreeNode(slicedMeshResults[NEGATIVE]);
+        meshTreeNode.Left.Parent = meshTreeNode;
+        meshTreeNode.Right.Parent = meshTreeNode;
     }   
 
     private void BuildMeshTree(Mesh mesh, int numberOfFragments)
@@ -110,11 +133,33 @@ public class MeshFragmenter : MonoBehaviour
     // Functions that Unity uses in its execution engine. 
     void Awake()
     {
+        Utility.RegisterLogFile();
         MeshFilter viewedModelFilter = GetComponent<MeshFilter>();
+        MeshRenderer viewModelRenderer = GetComponent<MeshRenderer>();
         mesh = viewedModelFilter.mesh;
         BuildMeshTree(mesh, numberOfFragments);
-    }
+        GameObject gameObjectLocal = new GameObject("A");
+        // TODO: Be careful about constructor vs Instantiate. 
+        gameObjectLocal.transform.position = new Vector3(3, 3, 3);
+        MeshCollider meshColider = gameObjectLocal.AddComponent<MeshCollider>() as MeshCollider;
+        meshColider.sharedMesh = meshTreeRoot.Left.Mesh;
+        meshColider.transform.parent = Selection.activeTransform;
+        MeshFilter meshFilter = gameObjectLocal.AddComponent<MeshFilter>() as MeshFilter;
+        meshFilter.mesh = meshTreeRoot.Left.Mesh;
+        MeshRenderer meshRenderer = gameObjectLocal.AddComponent<MeshRenderer>() as MeshRenderer;
+        meshRenderer.material = viewModelRenderer.material;
 
+        GameObject gameObjectLocalB = new GameObject("B");
+        // TODO: Be careful about constructor vs Instantiate. 
+        gameObjectLocalB.transform.position = new Vector3(-5, -5, -5);
+        meshColider = gameObjectLocalB.AddComponent<MeshCollider>() as MeshCollider;
+        meshColider.sharedMesh = meshTreeRoot.Right.Mesh;
+        meshColider.transform.parent = Selection.activeTransform;
+        meshFilter = gameObjectLocalB.AddComponent<MeshFilter>() as MeshFilter;
+        meshFilter.mesh = meshTreeRoot.Right.Mesh;
+        meshRenderer = gameObjectLocalB.AddComponent<MeshRenderer>() as MeshRenderer;
+        meshRenderer.material = viewModelRenderer.material;
+    }
 
     // Use this for initialization
     void Start () {
@@ -125,5 +170,4 @@ public class MeshFragmenter : MonoBehaviour
 	void Update () {
 		
 	}
-
 }

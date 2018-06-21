@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using UnityEngine;
 
@@ -25,11 +26,26 @@ namespace Assets.Scripts
             triangles.AddLast(idxVertex);
             triangles.AddLast(idxVertex + 1);
             triangles.AddLast(idxVertex + 2);
+
+            Debug.Log(String.Format("Vertex {0} {1} {2}", point1.ToString(), point2.ToString(), 
+                                                          point3.ToString()));
         }
 
         public Mesh Build()
         {
-            return null;
+            Mesh mesh = new Mesh();
+            
+            mesh.vertices = vertices.ToArray();
+            mesh.triangles = triangles.ToArray();
+
+            for (int idx = 0; idx < mesh.triangles.Length; idx+=3)
+            {
+                Debug.Log(String.Format("Triangle {0} {1} {2}", mesh.vertices[mesh.triangles[idx]].ToString(),
+                                                         mesh.vertices[mesh.triangles[idx + 1]].ToString(),
+                                                        mesh.vertices[mesh.triangles[idx + 2]].ToString()));
+            }
+            mesh.RecalculateNormals();
+            return mesh;
         }
     }
 }
