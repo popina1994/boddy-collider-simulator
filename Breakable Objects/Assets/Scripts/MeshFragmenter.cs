@@ -83,18 +83,19 @@ public class MeshFragmenter : MonoBehaviour
                         break;
                     }
                 }
-                Vector3 intersectionPoint1 = IntersectionSegmentPlane(plane, points[idxNext], points[idxPointOnOtherSide]);
-                Vector3 intersectionPoint2 = IntersectionSegmentPlane(plane, points[idxPrev], points[idxPointOnOtherSide]);
+                Vector3 intsecPointNext = IntersectionSegmentPlane(plane, points[idxNext], points[idxPointOnOtherSide]);
+                Vector3 intsecPointPrev = IntersectionSegmentPlane(plane, points[idxPrev], points[idxPointOnOtherSide]);
 
+                // IMPORTANT: Following order of points is important.
                 // Triangle whose only point from the bigger one is added.
                 Debug.Log("Cutting of a triangle");
                 Debug.Log(isPositive[idxPointOnOtherSide] ? "Positive" : "Negative");
-                meshBuilders[idxSide].AddTriangle(points[idxPointOnOtherSide], intersectionPoint1, intersectionPoint2);
+                meshBuilders[idxSide].AddTriangle(intsecPointPrev, points[idxPointOnOtherSide], intsecPointNext);
                 int idxOtherSide = (idxSide + 1) % NUM_SIDES;
                 Debug.Log(isPositive[idxNext] ? "Positive" : "Negative");
-                meshBuilders[idxOtherSide].AddTriangle(points[idxNext], intersectionPoint1, intersectionPoint2);
+                meshBuilders[idxOtherSide].AddTriangle(points[idxNext], intsecPointPrev, intsecPointNext);
                 Debug.Log(isPositive[idxPrev] ? "Positive" : "Negative");
-                meshBuilders[idxOtherSide].AddTriangle(points[idxPrev], points[idxNext], intersectionPoint2);
+                meshBuilders[idxOtherSide].AddTriangle(points[idxPrev], intsecPointPrev, points[idxNext]);
             }
         }
         Mesh[] meshBuild = new Mesh[NUM_SIDES];
@@ -109,8 +110,8 @@ public class MeshFragmenter : MonoBehaviour
     private static void SplitNode(MeshTreeNode meshTreeNode)
     {
         Vector3 center = new Vector3(0, 0, 0);
-        Vector3 random1 = new Vector3(1, 0, 0);
-        Vector3 random2 = new Vector3(0, 1, 0);
+        Vector3 random1 = new Vector3(0.5f,0.5f, 0.5f);
+        Vector3 random2 = new Vector3(0.5f, -0.5f, 0.5f);
         // TODO: Find a way how to calculate center of a mass of the mesh.
         //
         Plane planeCenter = new Plane(center, random1, random2);

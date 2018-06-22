@@ -31,6 +31,16 @@ namespace Assets.Scripts
                                                           point3.ToString()));
         }
 
+        public void AddTriangle(Vector3 point1, Vector3 point2, Vector3 point3, int[] orientation)
+        {
+            Vector3 []parameters = new Vector3[3];
+            parameters[orientation[0]] = point1;
+            parameters[orientation[1]] = point2;
+            parameters[orientation[2]] = point3;
+
+            AddTriangle(parameters[0], parameters[1], parameters[2]);
+        }
+
         public Mesh Build()
         {
             Mesh mesh = new Mesh();
