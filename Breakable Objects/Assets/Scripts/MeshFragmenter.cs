@@ -21,24 +21,7 @@ public class MeshFragmenter : MonoBehaviour
         return new MeshTreeNode(mesh);
     }
 
-    private static Vector3 IntersectionSegmentPlane(Plane plane, Vector3 point1, Vector3 point2)
-    {
-        float length;
-        float dotNumerator;
-        float dotDenominator;
-        Vector3 intersection;
-        Vector3 lineVec = point2 - point1;
-        Vector3 linePoint = point1;
-        Vector3 planePoint = plane.ClosestPointOnPlane(new Vector3(0, 0, 0));
 
-        dotNumerator = Vector3.Dot((planePoint - linePoint), plane.normal);
-        dotDenominator = Vector3.Dot(lineVec, plane.normal);
-
-        length = dotNumerator / dotDenominator;
-        intersection = linePoint + lineVec * length;
-
-        return intersection;
-    }
 
     private static Mesh[] SliceMesh(Plane plane, Mesh mesh)
     {
@@ -49,7 +32,7 @@ public class MeshFragmenter : MonoBehaviour
 
         for (int idx = 0; idx < NUM_SIDES; idx++)
         {
-            meshBuilders[idx] = new MeshBuilder();
+            meshBuilders[idx] = new MeshBuilder(plane);
         }
         
         for (int idxTriangle = 0; idxTriangle < mesh.triangles.Length; idxTriangle += NUM_POINTS)
@@ -83,9 +66,9 @@ public class MeshFragmenter : MonoBehaviour
                         break;
                     }
                 }
-                Vector3 intsecPointNext = IntersectionSegmentPlane(plane, points[idxNext], points[idxPointOnOtherSide]);
-                Vector3 intsecPointPrev = IntersectionSegmentPlane(plane, points[idxPrev], points[idxPointOnOtherSide]);
-
+                Vector3 intsecPointNext = Utility.IntersectionSegmentPlane(plane, points[idxNext], points[idxPointOnOtherSide]);
+                Vector3 intsecPointPrev = Utility.IntersectionSegmentPlane(plane, points[idxPrev], points[idxPointOnOtherSide]);
+                
                 // IMPORTANT: Following order of points is important.
                 // Triangle whose only point from the bigger one is added.
                 Debug.Log("Cutting of a triangle");
@@ -110,8 +93,8 @@ public class MeshFragmenter : MonoBehaviour
     private static void SplitNode(MeshTreeNode meshTreeNode)
     {
         Vector3 center = new Vector3(0, 0, 0);
-        Vector3 random1 = new Vector3(0.5f,0.5f, 0.5f);
-        Vector3 random2 = new Vector3(0.5f, -0.5f, 0.5f);
+        Vector3 random1 = new Vector3(0.5f,0.5f, 0.2f);
+        Vector3 random2 = new Vector3(0.5f, -0.5f, 0.2f);
         // TODO: Find a way how to calculate center of a mass of the mesh.
         //
         Plane planeCenter = new Plane(center, random1, random2);
