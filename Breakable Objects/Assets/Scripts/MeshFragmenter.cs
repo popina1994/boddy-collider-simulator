@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using Assets.Scripts;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
+// TODO: Try to change name of namespace so it corresponds to its file path. 
 public class MeshFragmenter : MonoBehaviour
 {
     private const int POSITIVE = 0;
@@ -23,12 +21,34 @@ public class MeshFragmenter : MonoBehaviour
         return new MeshTreeNode(mesh);
     }
 
+    // TODO: Update this for mesh that represents concave object.
+    private static Vector3 CalculateCenterOfMass(Mesh mesh)
+    {
+        Vector3 []vertices = mesh.vertices;
+        Vector3 initCenter = new Vector3(0, 0, 0);
+        Vector3 center = new Vector3(0, 0, 0);
+        float mass = 0.0f;
+        foreach (var vertexId in mesh.triangles)
+        {
+            initCenter += vertices[vertexId];
+        }
+        initCenter /= mesh.triangles.Length;
 
+        for (int idx = 0; idx < mesh.triangles.Length; idx += NUM_POINTS)
+        {
+            Tetrahedron tetrahedron = new Tetrahedron(vertices[mesh.triangles[idx]], vertices[mesh.triangles[idx+1]],
+                                                      vertices[mesh.triangles[idx+2]], initCenter);
+            center += tetrahedron.CalculateCenterOfMass() * tetrahedron.CalculateVolume();
+            mass += tetrahedron.CalculateVolume();
+        }
+
+        center /= mass;
+
+        return center;
+    }
 
     private static Mesh[] SliceMesh(Plane plane, Mesh mesh)
     {
-        Stopwatch sw = new Stopwatch();
-        sw.Start();
         Vector3[] meshVertices = mesh.vertices;
         MeshBuilder[] meshBuilders = new MeshBuilder[NUM_SIDES];
         Vector3[] points = new Vector3[NUM_POINTS];
@@ -96,11 +116,9 @@ public class MeshFragmenter : MonoBehaviour
 
     private static void SplitNode(MeshTreeNode meshTreeNode)
     {
-        Vector3 center = new Vector3(0, 0, 0);
+        Vector3 center = CalculateCenterOfMass(meshTreeNode.Mesh);
         Vector3 random1 = new Vector3(0.5f,0.5f, 0f);
         Vector3 random2 = new Vector3(0.5f, -0.5f, 0f);
-        // TODO: Find a way how to calculate center of a mass of the mesh.
-        //
         Plane planeCenter = new Plane(center, random1, random2);
 
         Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
@@ -128,7 +146,9 @@ public class MeshFragmenter : MonoBehaviour
         BuildMeshTree(mesh, numberOfFragments);
         GameObject gameObjectLocal = new GameObject("A");
         // TODO: Be careful about constructor vs Instantiate. 
+        // TODO: Refactor this code. 
         gameObjectLocal.transform.position = new Vector3(3, 3, 3);
+        gameObjectLocal.transform.localScale = GetComponent<Transform>().localScale;
         MeshCollider meshColider = gameObjectLocal.AddComponent<MeshCollider>() as MeshCollider;
         meshColider.sharedMesh = meshTreeRoot.Left.Mesh;
         meshColider.transform.parent = Selection.activeTransform;
@@ -140,6 +160,7 @@ public class MeshFragmenter : MonoBehaviour
         GameObject gameObjectLocalB = new GameObject("B");
         // TODO: Be careful about constructor vs Instantiate. 
         gameObjectLocalB.transform.position = new Vector3(-5, -5, -5);
+        gameObjectLocalB.transform.localScale = GetComponent<Transform>().localScale;
         meshColider = gameObjectLocalB.AddComponent<MeshCollider>() as MeshCollider;
         meshColider.sharedMesh = meshTreeRoot.Right.Mesh;
         meshColider.transform.parent = Selection.activeTransform;
