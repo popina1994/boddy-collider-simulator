@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Assets.Scripts;
 using UnityEditor;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 public class MeshFragmenter : MonoBehaviour
 {
@@ -25,6 +27,8 @@ public class MeshFragmenter : MonoBehaviour
 
     private static Mesh[] SliceMesh(Plane plane, Mesh mesh)
     {
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         Vector3[] meshVertices = mesh.vertices;
         MeshBuilder[] meshBuilders = new MeshBuilder[NUM_SIDES];
         Vector3[] points = new Vector3[NUM_POINTS];
@@ -93,8 +97,8 @@ public class MeshFragmenter : MonoBehaviour
     private static void SplitNode(MeshTreeNode meshTreeNode)
     {
         Vector3 center = new Vector3(0, 0, 0);
-        Vector3 random1 = new Vector3(0.5f,0.5f, 0.2f);
-        Vector3 random2 = new Vector3(0.5f, -0.5f, 0.2f);
+        Vector3 random1 = new Vector3(0.5f,0.5f, 0f);
+        Vector3 random2 = new Vector3(0.5f, -0.5f, 0f);
         // TODO: Find a way how to calculate center of a mass of the mesh.
         //
         Plane planeCenter = new Plane(center, random1, random2);
