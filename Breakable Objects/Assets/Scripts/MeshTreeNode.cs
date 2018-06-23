@@ -12,6 +12,7 @@ namespace Assets.Scripts
         private MeshTreeNode _left;
         private MeshTreeNode _right;
         private MeshTreeNode _parent;
+        private int _vertexIdx;
 
         public MeshTreeNode(Mesh mesh)
         {
@@ -27,19 +28,36 @@ namespace Assets.Scripts
         public MeshTreeNode Left
         {
             get { return _left; }
-            set { _left = value; }
+            set { _left = value;
+                value._parent = this;
+            }
         }
 
         public MeshTreeNode Right
         {
             get { return _right; }
-            set { _right = value; }
+            set { _right = value; value._parent= this; }
         }
 
         public MeshTreeNode Parent
         {
             get { return _parent; }
-            set { _parent = value; }
+        }
+
+        public int VertexIdx
+        {
+            get { return _vertexIdx; }
+            set { _vertexIdx = value; }
+        }
+
+        public bool IsLeaf()
+        {
+            return (Left == null) && (Right == null);
+        }
+
+        public bool Collides(MeshTreeNode meshTreeNode)
+        {
+            return Mesh.bounds.Intersects(meshTreeNode.Mesh.bounds);
         }
     }
 }

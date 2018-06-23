@@ -1,37 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using UnityEditor;
-using UnityEngine;
-using UnityScript.Steps;
+﻿using UnityEngine;
 
-
-namespace Assets.Scripts
+namespace Assets.Scripts.Utility
 {
-    class Utility
+    class MathUpgrade
     {
-        private const String FILE_NAME = "log.txt";
         private const float PRECISION = 0.000001f;
-        private static void  HandleLog(string logString, string stackTrace, LogType type)
-        {
-            using (StreamWriter w = File.AppendText(FILE_NAME))
-            {
-                w.WriteLine(logString);
-            }
-        }
-        
-        public static void RegisterLogFile()
-        {
-            Debug.unityLogger.logEnabled = false;
-            Application.logMessageReceived += HandleLog;
-            File.WriteAllText(FILE_NAME, String.Empty);
-        }
 
         public static bool AreEqual(float first, float second)
         {
-            return Math.Abs(first - second) < PRECISION;
+            return System.Math.Abs(first - second) < PRECISION;
         }
 
         public static Vector3 IntersectionSegmentPlane(Plane plane, Vector3 point1, Vector3 point2)

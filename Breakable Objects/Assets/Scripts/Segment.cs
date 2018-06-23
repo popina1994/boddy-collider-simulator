@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using MathUpgrade = Assets.Scripts.Utility.MathUpgrade;
 
 namespace Assets.Scripts
 {
@@ -37,7 +38,7 @@ namespace Assets.Scripts
 
         public bool IsOnPlane(Plane plane)
         {
-            return Utility.AreEqual(Vector3.Dot(plane.normal, _vectorDirection), 0f);
+            return MathUpgrade.AreEqual(Vector3.Dot(plane.normal, _vectorDirection), 0f);
         }
 
     }

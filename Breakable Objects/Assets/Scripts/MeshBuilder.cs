@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using MathUpgrade = Assets.Scripts.Utility.MathUpgrade;
 
 namespace Assets.Scripts
 {
@@ -24,7 +25,7 @@ namespace Assets.Scripts
         private void AddBorderEdge(Vector3 startPoint, Vector3 endPoint)
         {
             Segment segment = new Segment(startPoint, endPoint);
-            if (segment.IsOnPlane(plane) && (Utility.AreEqual(plane.GetDistanceToPoint(startPoint), 0f)))
+            if (segment.IsOnPlane(plane) && (MathUpgrade.AreEqual(plane.GetDistanceToPoint(startPoint), 0f)))
             {
                 borderEdges.Add(segment);
                 Debug.Log(String.Format("Edge {0} {1}", startPoint.ToString(), endPoint.ToString()));
