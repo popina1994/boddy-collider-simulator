@@ -94,7 +94,7 @@ namespace Assets.Scripts
                 }
                 //TODO: Remove this when concave fragmentation support is added. 
                 if ( (idx  == borderEdges.Count) && !found)
-                { 
+                {   
                     return vertexLoop;
                 }
             }

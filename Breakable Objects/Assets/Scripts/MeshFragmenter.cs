@@ -17,6 +17,19 @@ public class MeshFragmenter : MonoBehaviour
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private int numberOfFragments = 2;
+    private bool _initialized = false;
+    private static int _nameId = 0;
+
+    public bool Initialized
+    {
+        get { return _initialized; }
+        set { _initialized = value; }
+    }
+
+    public static int NameId
+    {
+        get { return _nameId++; }
+    }
 
     private static MeshTreeNode InstantiateTreeFromMesh(Mesh mesh)
     {
@@ -115,44 +128,17 @@ public class MeshFragmenter : MonoBehaviour
     // Functions that Unity uses in its execution engine. 
     void Awake()
     {
-        Mesh mesh;
-        LoggingUpgrade.RegisterLogFile();
-        MeshFilter viewedModelFilter = GetComponent<MeshFilter>();
-        MeshRenderer viewModelRenderer = GetComponent<MeshRenderer>();
-        mesh = viewedModelFilter.mesh;
-        BuildMeshTree(mesh, numberOfFragments);
-
-        _fragmentConnectivityGraph = new BCRBGraph(_meshTreeRoot);
-
-        GameObject gameObjectLocal = new GameObject("A");
-        // TODO: Be careful about constructor vs Instantiate. 
-        // TODO: Refactor this code. 
-        gameObjectLocal.transform.position = new Vector3(3, 3, 3);
-        gameObjectLocal.transform.localScale = GetComponent<Transform>().localScale;
-        MeshCollider meshColider = gameObjectLocal.AddComponent<MeshCollider>() as MeshCollider;
-        meshColider.sharedMesh = _meshTreeRoot.Left.Mesh;
-        meshColider.transform.parent = Selection.activeTransform;
-        MeshFilter meshFilter = gameObjectLocal.AddComponent<MeshFilter>() as MeshFilter;
-        meshFilter.mesh = _meshTreeRoot.Left.Mesh;
-        MeshRenderer meshRenderer = gameObjectLocal.AddComponent<MeshRenderer>() as MeshRenderer;
-        meshRenderer.material = viewModelRenderer.material;
-
-        GameObject gameObjectLocalB = new GameObject("B");
-        // TODO: Be careful about constructor vs Instantiate. 
-        gameObjectLocalB.transform.position = new Vector3(-5, -5, -5);
-        gameObjectLocalB.transform.localScale = GetComponent<Transform>().localScale;
-        meshColider = gameObjectLocalB.AddComponent<MeshCollider>() as MeshCollider;
-        meshColider.sharedMesh = _meshTreeRoot.Right.Mesh;
-        meshColider.transform.parent = Selection.activeTransform;
-        meshFilter = gameObjectLocalB.AddComponent<MeshFilter>() as MeshFilter;
-        meshFilter.mesh = _meshTreeRoot.Right.Mesh;
-        meshRenderer = gameObjectLocalB.AddComponent<MeshRenderer>() as MeshRenderer;
-        meshRenderer.material = viewModelRenderer.material;
+        if (!Initialized)
+        {
+            LoggingUpgrade.RegisterLogFile();
+            BuildMeshTree(GetComponent<MeshFilter>().mesh, numberOfFragments);
+            _fragmentConnectivityGraph = new BCRBGraph(_meshTreeRoot);
+        }
     }
 
     // Use this for initialization
-    void Start () {
-        
+    void Start ()
+    {
         GetComponent<Rigidbody>().freezeRotation = true;
     }
 	
@@ -168,6 +154,38 @@ public class MeshFragmenter : MonoBehaviour
         //rigidbody.AddForce(0, 0, 2000 * Time.deltaTime);
     }
 
+    private static void AddThisComponentBeforeAwake(GameObject gameObject)
+    {
+        gameObject.SetActive(false);
+        gameObject.AddComponent<MeshFragmenter>();
+        gameObject.GetComponent<MeshFragmenter>().Initialized = true;
+        gameObject.SetActive(true);
+    }
+
+    private static void FragmentGameObject(GameObject gameObject, MeshTreeNode meshTreeRoot)
+    {   
+        GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
+        {
+            typeof(MeshRenderer), typeof(MeshFilter), typeof(MeshCollider), typeof(Rigidbody)
+        });
+
+        gameObjectFragmentNew.transform.position = gameObject.transform.position;
+        gameObjectFragmentNew.transform.localScale = gameObject.GetComponent<Transform>().localScale;
+
+        MeshFilter meshFilter = gameObjectFragmentNew.GetComponent<MeshFilter>();
+        MeshRenderer meshRenderer = gameObjectFragmentNew.GetComponent<MeshRenderer>();
+        MeshCollider meshColider = gameObjectFragmentNew.GetComponent<MeshCollider>();
+        Rigidbody rigidbody = gameObjectFragmentNew.GetComponent<Rigidbody>();
+
+        meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
+        meshFilter.mesh = meshTreeRoot.Left.Mesh;
+        rigidbody.mass = 0.5f;
+        AddThisComponentBeforeAwake(gameObjectFragmentNew);
+
+        //meshColider.sharedMesh = meshTreeRoot.Left.Mesh;
+        //meshColider.transform.parent = Selection.activeTransform;
+    }
+
     void OnCollisionEnter(Collision collision)
     {
         Vector3 v1 = GetComponent<Rigidbody>().velocity;
@@ -177,6 +195,22 @@ public class MeshFragmenter : MonoBehaviour
         {
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
         }
+        // TODO: Change veliocites of the figures so they get new ones. 
+        MeshRenderer viewModelRenderer = GetComponent<MeshRenderer>();
+        FragmentGameObject(this.gameObject, _meshTreeRoot);
 
+        GameObject gameObjectLocalB = new GameObject("B");
+        // TODO: Be careful about constructor vs Instantiate. 
+        gameObjectLocalB.transform.position = new Vector3(-5, -5, -5);
+        gameObjectLocalB.transform.localScale = GetComponent<Transform>().localScale;
+        MeshCollider meshColider = gameObjectLocalB.AddComponent<MeshCollider>() as MeshCollider;
+        meshColider.sharedMesh = _meshTreeRoot.Right.Mesh;
+        //meshColider.transform.parent = Selection.activeTransform;
+        MeshFilter meshFilter = gameObjectLocalB.AddComponent<MeshFilter>() as MeshFilter;
+        meshFilter.mesh = _meshTreeRoot.Right.Mesh;
+        MeshRenderer meshRenderer = gameObjectLocalB.AddComponent<MeshRenderer>() as MeshRenderer;
+        meshRenderer.material = viewModelRenderer.material;
+
+        Destroy(this.gameObject);
     }
 }
