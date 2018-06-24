@@ -108,8 +108,9 @@ public class MeshFragmenter : MonoBehaviour
     private static void SplitNode(MeshTreeNode meshTreeNode)
     {
         Vector3 center = MeshUpgrade.CalculateCenterOfMass(meshTreeNode.Mesh);
-        Vector3 random1 = new Vector3(0.5f,0.5f, 0f);
-        Vector3 random2 = new Vector3(0.5f, -0.5f, 0f);
+        System.Random random = new System.Random();
+        Vector3 random1 = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
+        Vector3 random2 = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
         Plane planeCenter = new Plane(center, random1, random2);
 
         Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
@@ -139,7 +140,6 @@ public class MeshFragmenter : MonoBehaviour
     // Use this for initialization
     void Start ()
     {
-        GetComponent<Rigidbody>().freezeRotation = true;
     }
 	
 	// Update is called once per frame
@@ -166,10 +166,19 @@ public class MeshFragmenter : MonoBehaviour
     {   
         GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
         {
-            typeof(MeshRenderer), typeof(MeshFilter), typeof(MeshCollider), typeof(Rigidbody)
+            typeof(MeshRenderer), typeof(MeshFilter), typeof(Rigidbody), typeof(MeshCollider)
         });
+        Vector3 displacement;
+        if (meshTreeRoot.Parent.Left == meshTreeRoot)
+        {
+            displacement = new Vector3(-1, -1, -1);
+        }
+        else
+        {
+            displacement = new Vector3(1, 1, 1);
+        }
 
-        gameObjectFragmentNew.transform.position = gameObject.transform.position;
+        gameObjectFragmentNew.transform.position = gameObject.transform.position + displacement;
         gameObjectFragmentNew.transform.localScale = gameObject.GetComponent<Transform>().localScale;
 
         MeshFilter meshFilter = gameObjectFragmentNew.GetComponent<MeshFilter>();
@@ -178,38 +187,29 @@ public class MeshFragmenter : MonoBehaviour
         Rigidbody rigidbody = gameObjectFragmentNew.GetComponent<Rigidbody>();
 
         meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
-        meshFilter.mesh = meshTreeRoot.Left.Mesh;
+        meshFilter.mesh = meshTreeRoot.Mesh;
         rigidbody.mass = 0.5f;
         AddThisComponentBeforeAwake(gameObjectFragmentNew);
-
-        //meshColider.sharedMesh = meshTreeRoot.Left.Mesh;
-        //meshColider.transform.parent = Selection.activeTransform;
+        meshColider.convex = true;
+        meshColider.sharedMesh = meshTreeRoot.Mesh;
     }
 
     void OnCollisionEnter(Collision collision)
     {
-        Vector3 v1 = GetComponent<Rigidbody>().velocity;
-        Vector3 v2 = collision.gameObject.GetComponent<Rigidbody>().velocity;
+        if (Initialized)
+        {
+            return;
+        }
         ContactPoint contactPoint = collision.contacts[0];
         if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint))
         {
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
         }
-        // TODO: Change veliocites of the figures so they get new ones. 
-        MeshRenderer viewModelRenderer = GetComponent<MeshRenderer>();
-        FragmentGameObject(this.gameObject, _meshTreeRoot);
 
-        GameObject gameObjectLocalB = new GameObject("B");
-        // TODO: Be careful about constructor vs Instantiate. 
-        gameObjectLocalB.transform.position = new Vector3(-5, -5, -5);
-        gameObjectLocalB.transform.localScale = GetComponent<Transform>().localScale;
-        MeshCollider meshColider = gameObjectLocalB.AddComponent<MeshCollider>() as MeshCollider;
-        meshColider.sharedMesh = _meshTreeRoot.Right.Mesh;
-        //meshColider.transform.parent = Selection.activeTransform;
-        MeshFilter meshFilter = gameObjectLocalB.AddComponent<MeshFilter>() as MeshFilter;
-        meshFilter.mesh = _meshTreeRoot.Right.Mesh;
-        MeshRenderer meshRenderer = gameObjectLocalB.AddComponent<MeshRenderer>() as MeshRenderer;
-        meshRenderer.material = viewModelRenderer.material;
+        this.gameObject.GetComponent<MeshCollider>().enabled = false;
+        // TODO: Change veliocites of the figures so they get new ones. 
+        FragmentGameObject(this.gameObject, _meshTreeRoot.Left);
+        FragmentGameObject(this.gameObject, _meshTreeRoot.Right);
 
         Destroy(this.gameObject);
     }
