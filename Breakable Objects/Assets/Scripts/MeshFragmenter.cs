@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 using MathUpgrade = Assets.Scripts.Utility.MathUpgrade;
+using Random = UnityEngine.Random;
 
 // TODO: Try to change name of namespace so it corresponds to its file path. 
 public class MeshFragmenter : MonoBehaviour
@@ -14,9 +15,9 @@ public class MeshFragmenter : MonoBehaviour
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
+    private const int NUMBER_OF_FRAGMENTS = 16;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
-    private int numberOfFragments = 2;
     private bool _initialized = false;
     private static int _nameId = 0;
 
@@ -105,25 +106,30 @@ public class MeshFragmenter : MonoBehaviour
         return meshBuild;
     }
 
-    private static void SplitNode(MeshTreeNode meshTreeNode)
+    private static void SplitNode(MeshTreeNode meshTreeNode, int numberOfFragments)
     {
         Vector3 center = MeshUpgrade.CalculateCenterOfMass(meshTreeNode.Mesh);
-        System.Random random = new System.Random();
-        Vector3 random1 = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
-        Vector3 random2 = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
+        // TODO: Scale number
+        Vector3 random1 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+        Vector3 random2 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
         Plane planeCenter = new Plane(center, random1, random2);
 
         Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
-        // TODO: Add multiple fragments generation. 
-        //
         meshTreeNode.Left = new MeshTreeNode(slicedMeshResults[POSITIVE]);
         meshTreeNode.Right = new MeshTreeNode(slicedMeshResults[NEGATIVE]);
+
+        numberOfFragments *= 2;
+        if (numberOfFragments < NUMBER_OF_FRAGMENTS)
+        { 
+            SplitNode(meshTreeNode.Left, numberOfFragments);
+            SplitNode(meshTreeNode.Right, numberOfFragments);
+        }
     }   
 
     private void BuildMeshTree(Mesh mesh, int numberOfFragments)
     {
         _meshTreeRoot = InstantiateTreeFromMesh(mesh);
-        SplitNode(_meshTreeRoot);
+        SplitNode(_meshTreeRoot, numberOfFragments);
     }
 
     // Functions that Unity uses in its execution engine. 
@@ -132,7 +138,7 @@ public class MeshFragmenter : MonoBehaviour
         if (!Initialized)
         {
             LoggingUpgrade.RegisterLogFile();
-            BuildMeshTree(GetComponent<MeshFilter>().mesh, numberOfFragments);
+            BuildMeshTree(GetComponent<MeshFilter>().mesh, 1);
             _fragmentConnectivityGraph = new BCRBGraph(_meshTreeRoot);
         }
     }
@@ -149,9 +155,6 @@ public class MeshFragmenter : MonoBehaviour
 
     void FixedUpdate()
     {
-        Rigidbody rigidbody = GetComponent<Rigidbody>();
-        //rigidbody.velocity = new Vector3(10, 10, 10);
-        //rigidbody.AddForce(0, 0, 2000 * Time.deltaTime);
     }
 
     private static void AddThisComponentBeforeAwake(GameObject gameObject)
@@ -168,17 +171,8 @@ public class MeshFragmenter : MonoBehaviour
         {
             typeof(MeshRenderer), typeof(MeshFilter), typeof(Rigidbody), typeof(MeshCollider)
         });
-        Vector3 displacement;
-        if (meshTreeRoot.Parent.Left == meshTreeRoot)
-        {
-            displacement = new Vector3(-1, -1, -1);
-        }
-        else
-        {
-            displacement = new Vector3(1, 1, 1);
-        }
 
-        gameObjectFragmentNew.transform.position = gameObject.transform.position + displacement;
+        gameObjectFragmentNew.transform.position = gameObject.transform.position;
         gameObjectFragmentNew.transform.localScale = gameObject.GetComponent<Transform>().localScale;
 
         MeshFilter meshFilter = gameObjectFragmentNew.GetComponent<MeshFilter>();
@@ -194,6 +188,78 @@ public class MeshFragmenter : MonoBehaviour
         meshColider.sharedMesh = meshTreeRoot.Mesh;
     }
 
+    private static void InitMeshTreeNodes(MeshTreeNode rootTreeNode)
+    {
+        LinkedList<MeshTreeNode> nodesToVisit = new LinkedList<MeshTreeNode>();
+        nodesToVisit.AddLast(rootTreeNode);
+        while (nodesToVisit.Count != 0)
+        {
+            MeshTreeNode visitNode = nodesToVisit.First.Value;
+            nodesToVisit.RemoveFirst();
+            visitNode.Reset();
+            if (visitNode.Left != null)
+            {
+                nodesToVisit.AddLast(visitNode.Left);
+            }
+            if (visitNode.Right != null)
+            {
+                nodesToVisit.AddLast(visitNode.Right);
+            }
+        }
+    }
+
+    // TODO: Upgrade for non 2base version of number of fragments.
+    private static void VisitAndGenerateMinimalMeshTrees(MeshTreeNode root)
+    {
+        if (root.IsLeaf())
+        {
+            return;
+        }
+
+        VisitAndGenerateMinimalMeshTrees(root.Left);
+        VisitAndGenerateMinimalMeshTrees(root.Right);
+        if (root.Left.IsMinmal && root.Right.IsMinmal)
+        {
+            root.IsMinmal = true;
+        }
+    }
+
+    List<MeshTreeNode> GetMinimalMeshTrees(BCRBGraph graph)
+    {
+        List<MeshTreeNode> minimalMeshTrees = new List<MeshTreeNode>();
+        LinkedList<MeshTreeNode> visitNodes = new LinkedList<MeshTreeNode>();
+        InitMeshTreeNodes(_meshTreeRoot);
+        foreach (MeshTreeNode fragment in graph.Fragments)
+        {
+            fragment.IsMinmal = true;
+        }
+
+        VisitAndGenerateMinimalMeshTrees(_meshTreeRoot);
+        visitNodes.AddLast(_meshTreeRoot);
+        while (visitNodes.Count != 0)
+        {
+            MeshTreeNode visitNode = visitNodes.First.Value;
+            visitNodes.RemoveFirst();
+            if (visitNode.IsMinmal)
+            {
+                minimalMeshTrees.Add(visitNode);
+            }
+            else
+            {
+                if (visitNode.Left != null)
+                {
+                    visitNodes.AddLast(visitNode.Left);
+                }
+                if (visitNode.Right != null)
+                {
+                    visitNodes.AddLast(visitNode.Right);
+                }
+            }
+        }
+
+        return minimalMeshTrees;
+    }
+
     void OnCollisionEnter(Collision collision)
     {
         if (Initialized)
@@ -203,14 +269,16 @@ public class MeshFragmenter : MonoBehaviour
         ContactPoint contactPoint = collision.contacts[0];
         if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint))
         {
+            this.gameObject.GetComponent<MeshCollider>().enabled = false;
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
+            foreach (var componentGraph in components)
+            {
+                List<MeshTreeNode> meshTrees = GetMinimalMeshTrees(componentGraph);
+                // TODO: Change veliocites of the figures so they get new ones. 
+                // TODO: Change signature of the function so it accepts multiple trees.
+                FragmentGameObject(this.gameObject, meshTrees[0]);
+            }
+            Destroy(this.gameObject);
         }
-
-        this.gameObject.GetComponent<MeshCollider>().enabled = false;
-        // TODO: Change veliocites of the figures so they get new ones. 
-        FragmentGameObject(this.gameObject, _meshTreeRoot.Left);
-        FragmentGameObject(this.gameObject, _meshTreeRoot.Right);
-
-        Destroy(this.gameObject);
     }
 }

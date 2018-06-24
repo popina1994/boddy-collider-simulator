@@ -13,6 +13,7 @@ namespace Assets.Scripts
         private MeshTreeNode _right;
         private MeshTreeNode _parent;
         private int _vertexIdx;
+        private bool _isMinmal;
 
         public MeshTreeNode(Mesh mesh)
         {
@@ -48,6 +49,18 @@ namespace Assets.Scripts
         {
             get { return _vertexIdx; }
             set { _vertexIdx = value; }
+        }
+
+        public bool IsMinmal
+        {
+            get { return _isMinmal; }
+            set { _isMinmal = value; }
+        }
+
+        public void Reset()
+        {
+            VertexIdx = -1;
+            IsMinmal = false;
         }
 
         public bool IsLeaf()
