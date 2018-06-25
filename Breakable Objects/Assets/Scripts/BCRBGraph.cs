@@ -150,8 +150,11 @@ namespace Assets.Scripts
             return connectivityComponents;
         }
 
-        public bool OnCollisionDamaged(ContactPoint contactPoint)
+        public bool OnCollisionDamaged(ContactPoint contactPoint, float impulseIntensity)
         {
+            float damage;
+            float s;
+            int idx = 0;
             // TODO: Add real damage calculation.
             bool damaged = false;
             foreach (var adjacentList in Edges)
@@ -159,8 +162,13 @@ namespace Assets.Scripts
                 foreach (var edge in adjacentList)
                 {
                     damaged = true;
+                    Vector3 edgePosition = (Fragments[idx].CenterOfMass + edge.Fragment.CenterOfMass) / 2;
+                    s = Vector3.Distance(edgePosition, contactPoint.point);
+                    //edge.Damage(impulseIntensity / (s * s * s));
                     edge.Damage(HIT_POINTS_MAX);
                 }
+
+                idx++;
             }
 
             return damaged;

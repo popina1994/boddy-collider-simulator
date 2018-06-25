@@ -14,6 +14,8 @@ namespace Assets.Scripts
         private MeshTreeNode _parent;
         private int _vertexIdx;
         private bool _isMinmal;
+        private Vector3 _centerOfMass;
+        private float _mass;
 
         public MeshTreeNode(Mesh mesh)
         {
@@ -55,6 +57,18 @@ namespace Assets.Scripts
         {
             get { return _isMinmal; }
             set { _isMinmal = value; }
+        }
+
+        public Vector3 CenterOfMass
+        {
+            get { return _centerOfMass; }
+            set { _centerOfMass = value; }
+        }
+
+        public float Mass
+        {
+            get { return _mass; }
+            set { _mass = value; }
         }
 
         public void Reset()

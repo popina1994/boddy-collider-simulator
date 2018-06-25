@@ -15,7 +15,7 @@ public class MeshFragmenter : MonoBehaviour
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
-    private const int NUMBER_OF_FRAGMENTS = 16;
+    private const int NUMBER_OF_FRAGMENTS = 32;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private bool _initialized = false;
@@ -108,19 +108,21 @@ public class MeshFragmenter : MonoBehaviour
 
     private static void SplitNode(MeshTreeNode meshTreeNode, int numberOfFragments)
     {
-        Vector3 center = MeshUpgrade.CalculateCenterOfMass(meshTreeNode.Mesh);
-        // TODO: Scale number
-        Vector3 random1 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
-        Vector3 random2 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
-        Plane planeCenter = new Plane(center, random1, random2);
-
-        Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
-        meshTreeNode.Left = new MeshTreeNode(slicedMeshResults[POSITIVE]);
-        meshTreeNode.Right = new MeshTreeNode(slicedMeshResults[NEGATIVE]);
-
-        numberOfFragments *= 2;
+        // TODO: Refactor this.
+        Vector3 centerOfMass = MeshUpgrade.CalculateCenterOfMass(meshTreeNode.Mesh);
+        meshTreeNode.CenterOfMass = centerOfMass;
+        meshTreeNode.Mass = MeshUpgrade.CalculateMass(meshTreeNode.Mesh);
         if (numberOfFragments < NUMBER_OF_FRAGMENTS)
-        { 
+        {
+            Vector3 random1 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+            Vector3 random2 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+            Plane planeCenter = new Plane(centerOfMass, random1, random2);
+
+            Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
+            meshTreeNode.Left = new MeshTreeNode(slicedMeshResults[POSITIVE]);
+            meshTreeNode.Right = new MeshTreeNode(slicedMeshResults[NEGATIVE]);
+            numberOfFragments *= 2;
+
             SplitNode(meshTreeNode.Left, numberOfFragments);
             SplitNode(meshTreeNode.Right, numberOfFragments);
         }
@@ -165,7 +167,7 @@ public class MeshFragmenter : MonoBehaviour
         gameObject.SetActive(true);
     }
 
-    private static void FragmentGameObject(GameObject gameObject, MeshTreeNode meshTreeRoot)
+    private static void FragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
     {   
         GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
         {
@@ -181,11 +183,22 @@ public class MeshFragmenter : MonoBehaviour
         Rigidbody rigidbody = gameObjectFragmentNew.GetComponent<Rigidbody>();
 
         meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
-        meshFilter.mesh = meshTreeRoot.Mesh;
-        rigidbody.mass = 0.5f;
+        
+        rigidbody.mass = 0;
+        CombineInstance [] combine = new CombineInstance[meshTreeNodes.Count];
+        int idx = 0;
+        meshFilter.mesh = new Mesh();
+        foreach (var meshTreeNode in meshTreeNodes)
+        {
+            combine[idx].mesh = meshTreeNode.Mesh;
+            rigidbody.mass += meshTreeNode.Mass;
+        }
+        //meshFilter.mesh.CombineMeshes(combine);
+        meshFilter.mesh = meshTreeNodes[0].Mesh;
+        rigidbody.useGravity = false;
         AddThisComponentBeforeAwake(gameObjectFragmentNew);
         meshColider.convex = true;
-        meshColider.sharedMesh = meshTreeRoot.Mesh;
+        meshColider.sharedMesh = meshFilter.mesh;
     }
 
     private static void InitMeshTreeNodes(MeshTreeNode rootTreeNode)
@@ -267,16 +280,21 @@ public class MeshFragmenter : MonoBehaviour
             return;
         }
         ContactPoint contactPoint = collision.contacts[0];
-        if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint))
+        float impulseIntensity = Vector3.Magnitude(
+                        this.gameObject.GetComponent<Rigidbody>().velocity * 
+                        this.gameObject.GetComponent<Rigidbody>().mass
+                        + 
+                        collision.gameObject.GetComponent<Rigidbody>().velocity * 
+                        collision.gameObject.GetComponent<Rigidbody>().mass);
+
+        if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint, impulseIntensity))
         {
             this.gameObject.GetComponent<MeshCollider>().enabled = false;
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
             foreach (var componentGraph in components)
             {
                 List<MeshTreeNode> meshTrees = GetMinimalMeshTrees(componentGraph);
-                // TODO: Change veliocites of the figures so they get new ones. 
-                // TODO: Change signature of the function so it accepts multiple trees.
-                FragmentGameObject(this.gameObject, meshTrees[0]);
+                FragmentGameObject(this.gameObject, meshTrees);
             }
             Destroy(this.gameObject);
         }

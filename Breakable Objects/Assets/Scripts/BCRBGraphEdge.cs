@@ -10,10 +10,12 @@ namespace Assets.Scripts
         private float _hitPoints;
         private MeshTreeNode _fragment;
 
+
         public BCRBGraphEdge(float hitPoints, MeshTreeNode fragment)
         {
             _hitPoints = hitPoints;
             _fragment = fragment;
+            
         }
 
         public float HitPoints
