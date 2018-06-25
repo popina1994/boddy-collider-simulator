@@ -28,7 +28,7 @@ namespace Assets.Scripts
             if (segment.IsOnPlane(plane) && (MathUpgrade.AreEqual(plane.GetDistanceToPoint(startPoint), 0f)))
             {
                 borderEdges.Add(segment);
-                Debug.Log(String.Format("Edge {0} {1}", startPoint.ToString(), endPoint.ToString()));
+                //Debug.Log(String.Format("Edge {0} {1}", startPoint.ToString(), endPoint.ToString()));
             }
         }
 
@@ -50,8 +50,8 @@ namespace Assets.Scripts
                 AddBorderEdge(point3, point1);
             }
             
-            Debug.Log(String.Format("Vertex {0} {1} {2}", point1.ToString(), point2.ToString(),
-                point3.ToString()));
+            /*Debug.Log(String.Format("Vertex {0} {1} {2}", point1.ToString(), point2.ToString(),
+                point3.ToString()));*/
             
         }
 
@@ -94,7 +94,7 @@ namespace Assets.Scripts
                 }
                 //TODO: Remove this when concave fragmentation support is added. 
                 if ( (idx  == borderEdges.Count) && !found)
-                {   
+                {       
                     return vertexLoop;
                 }
             }
@@ -129,9 +129,10 @@ namespace Assets.Scripts
             
             for (int idx = 0; idx < mesh.triangles.Length; idx+=3)
             {
-                Debug.Log(String.Format("Triangle {0} {1} {2}", mesh.vertices[mesh.triangles[idx]].ToString(),
+                /*Debug.Log(String.Format("Triangle {0} {1} {2}", mesh.vertices[mesh.triangles[idx]].ToString(),
                                                          mesh.vertices[mesh.triangles[idx + 1]].ToString(),
                                                         mesh.vertices[mesh.triangles[idx + 2]].ToString()));
+                */
             }
             
             mesh.RecalculateNormals();

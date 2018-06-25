@@ -10,16 +10,31 @@ using MathUpgrade = Assets.Scripts.Utility.MathUpgrade;
 using Random = UnityEngine.Random;
 
 // TODO: Try to change name of namespace so it corresponds to its file path. 
+[RequireComponent(typeof(MeshFragmenter))]
+[RequireComponent(typeof(MeshFilter))]
+[RequireComponent(typeof(Rigidbody))]
 public class MeshFragmenter : MonoBehaviour
 {
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
-    private const int NUMBER_OF_FRAGMENTS = 32;
+    private const int NUMBER_OF_FRAGMENTS = 128;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private bool _initialized = false;
     private static int _nameId = 0;
+
+    private MeshTreeNode MeshTreeRoot
+    {
+        get { return _meshTreeRoot; }
+        set { _meshTreeRoot = value; }
+    }
+
+    private BCRBGraph FragmentConnectivityGraph
+    {
+        get { return _fragmentConnectivityGraph; }
+        set { _fragmentConnectivityGraph = value; }
+    }
 
     public bool Initialized
     {
@@ -63,7 +78,7 @@ public class MeshFragmenter : MonoBehaviour
             if ((isPositive[0] == isPositive[1]) && (isPositive[1] == isPositive[2]))
             {
                 idxSide = isPositive[0] ? POSITIVE : NEGATIVE;
-                Debug.Log(isPositive[0] ? "Positive" : "Negative");
+                ////Debug.Log(isPositive[0] ? "Positive" : "Negative");
                 meshBuilders[idxSide].AddTriangle(points[0], points[1], points[2]);
             }
             else
@@ -87,20 +102,20 @@ public class MeshFragmenter : MonoBehaviour
                 
                 // IMPORTANT: Following order of points is important.
                 // Triangle whose only point from the bigger one is added.
-                Debug.Log("Cutting of a triangle");
-                Debug.Log(isPositive[idxPointOnOtherSide] ? "Positive" : "Negative");
+                //Debug.Log("Cutting of a triangle");
+                //Debug.Log(isPositive[idxPointOnOtherSide] ? "Positive" : "Negative");
                 meshBuilders[idxSide].AddTriangle(intsecPointPrev, points[idxPointOnOtherSide], intsecPointNext);
                 int idxOtherSide = (idxSide + 1) % NUM_SIDES;
-                Debug.Log(isPositive[idxNext] ? "Positive" : "Negative");
+                //Debug.Log(isPositive[idxNext] ? "Positive" : "Negative");
                 meshBuilders[idxOtherSide].AddTriangle(points[idxNext], intsecPointPrev, intsecPointNext);
-                Debug.Log(isPositive[idxPrev] ? "Positive" : "Negative");
+                //Debug.Log(isPositive[idxPrev] ? "Positive" : "Negative");
                 meshBuilders[idxOtherSide].AddTriangle(points[idxPrev], intsecPointPrev, points[idxNext]);
             }
         }
         Mesh[] meshBuild = new Mesh[NUM_SIDES];
         for (int idx = 0; idx < NUM_SIDES; idx++)
         {
-            Debug.Log(idx);
+            //Debug.Log(idx);
             meshBuild[idx] = meshBuilders[idx].Build();
         }
         return meshBuild;
@@ -112,6 +127,11 @@ public class MeshFragmenter : MonoBehaviour
         Vector3 centerOfMass = MeshUpgrade.CalculateCenterOfMass(meshTreeNode.Mesh);
         meshTreeNode.CenterOfMass = centerOfMass;
         meshTreeNode.Mass = MeshUpgrade.CalculateMass(meshTreeNode.Mesh);
+        if (numberOfFragments == NUMBER_OF_FRAGMENTS)
+        {
+            Debug.Log(String.Format("CenterOfMass{0}", centerOfMass.ToString()));
+            Debug.Log(String.Format("Mass{0}", centerOfMass.ToString()));
+        }
         if (numberOfFragments < NUMBER_OF_FRAGMENTS)
         {
             Vector3 random1 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
@@ -130,8 +150,8 @@ public class MeshFragmenter : MonoBehaviour
 
     private void BuildMeshTree(Mesh mesh, int numberOfFragments)
     {
-        _meshTreeRoot = InstantiateTreeFromMesh(mesh);
-        SplitNode(_meshTreeRoot, numberOfFragments);
+        MeshTreeRoot = InstantiateTreeFromMesh(mesh);
+        SplitNode(MeshTreeRoot, numberOfFragments);
     }
 
     // Functions that Unity uses in its execution engine. 
@@ -141,7 +161,7 @@ public class MeshFragmenter : MonoBehaviour
         {
             LoggingUpgrade.RegisterLogFile();
             BuildMeshTree(GetComponent<MeshFilter>().mesh, 1);
-            _fragmentConnectivityGraph = new BCRBGraph(_meshTreeRoot);
+            _fragmentConnectivityGraph = new BCRBGraph(MeshTreeRoot);
         }
     }
 
@@ -151,7 +171,8 @@ public class MeshFragmenter : MonoBehaviour
     }
 	
 	// Update is called once per frame
-	void Update () {
+	void Update ()
+    { 
 		
 	}
 
@@ -167,38 +188,38 @@ public class MeshFragmenter : MonoBehaviour
         gameObject.SetActive(true);
     }
 
-    private static void FragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
+    private static void CreateFragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
     {   
         GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
         {
             typeof(MeshRenderer), typeof(MeshFilter), typeof(Rigidbody), typeof(MeshCollider)
         });
 
-        gameObjectFragmentNew.transform.position = gameObject.transform.position;
-        gameObjectFragmentNew.transform.localScale = gameObject.GetComponent<Transform>().localScale;
-
         MeshFilter meshFilter = gameObjectFragmentNew.GetComponent<MeshFilter>();
         MeshRenderer meshRenderer = gameObjectFragmentNew.GetComponent<MeshRenderer>();
         MeshCollider meshColider = gameObjectFragmentNew.GetComponent<MeshCollider>();
         Rigidbody rigidbody = gameObjectFragmentNew.GetComponent<Rigidbody>();
 
-        meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
-        
         rigidbody.mass = 0;
-        CombineInstance [] combine = new CombineInstance[meshTreeNodes.Count];
+        CombineInstance[] combine = new CombineInstance[meshTreeNodes.Count];
         int idx = 0;
         meshFilter.mesh = new Mesh();
         foreach (var meshTreeNode in meshTreeNodes)
         {
             combine[idx].mesh = meshTreeNode.Mesh;
+            combine[idx].transform = gameObject.GetComponent<MeshFilter>().transform.localToWorldMatrix;
             rigidbody.mass += meshTreeNode.Mass;
+            idx++;
         }
-        //meshFilter.mesh.CombineMeshes(combine);
-        meshFilter.mesh = meshTreeNodes[0].Mesh;
-        rigidbody.useGravity = false;
-        AddThisComponentBeforeAwake(gameObjectFragmentNew);
+        meshFilter.mesh.CombineMeshes(combine);
+        rigidbody.useGravity = gameObject.GetComponent<Rigidbody>().useGravity;
         meshColider.convex = true;
         meshColider.sharedMesh = meshFilter.mesh;
+        
+        AddThisComponentBeforeAwake(gameObjectFragmentNew);
+
+        meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
+
     }
 
     private static void InitMeshTreeNodes(MeshTreeNode rootTreeNode)
@@ -241,14 +262,14 @@ public class MeshFragmenter : MonoBehaviour
     {
         List<MeshTreeNode> minimalMeshTrees = new List<MeshTreeNode>();
         LinkedList<MeshTreeNode> visitNodes = new LinkedList<MeshTreeNode>();
-        InitMeshTreeNodes(_meshTreeRoot);
+        InitMeshTreeNodes(MeshTreeRoot);
         foreach (MeshTreeNode fragment in graph.Fragments)
         {
             fragment.IsMinmal = true;
         }
 
-        VisitAndGenerateMinimalMeshTrees(_meshTreeRoot);
-        visitNodes.AddLast(_meshTreeRoot);
+        VisitAndGenerateMinimalMeshTrees(MeshTreeRoot);
+        visitNodes.AddLast(MeshTreeRoot);
         while (visitNodes.Count != 0)
         {
             MeshTreeNode visitNode = visitNodes.First.Value;
@@ -287,14 +308,16 @@ public class MeshFragmenter : MonoBehaviour
                         collision.gameObject.GetComponent<Rigidbody>().velocity * 
                         collision.gameObject.GetComponent<Rigidbody>().mass);
 
-        if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint, impulseIntensity))
+        if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint, this.gameObject.GetComponent<Transform>(),
+                                                         impulseIntensity))
         {
             this.gameObject.GetComponent<MeshCollider>().enabled = false;
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
+            Debug.Log(String.Format("Number of components{0}", components.Count));
             foreach (var componentGraph in components)
             {
                 List<MeshTreeNode> meshTrees = GetMinimalMeshTrees(componentGraph);
-                FragmentGameObject(this.gameObject, meshTrees);
+                CreateFragmentGameObject(this.gameObject, meshTrees);
             }
             Destroy(this.gameObject);
         }
