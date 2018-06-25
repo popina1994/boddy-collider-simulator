@@ -10,7 +10,7 @@ namespace Assets.Scripts
 
     class BCRBGraph
     {
-        private const float HIT_POINTS_MAX = 0.3f;
+        private const float HIT_POINTS_MAX = 3f;
         private List<MeshTreeNode> _fragments;
 
         /// <summary>

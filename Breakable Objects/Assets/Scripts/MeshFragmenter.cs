@@ -18,7 +18,7 @@ public class MeshFragmenter : MonoBehaviour
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
-    private const int NUMBER_OF_FRAGMENTS = 128;
+    private const int NUMBER_OF_FRAGMENTS = 1024;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private bool _initialized = false;
@@ -134,8 +134,8 @@ public class MeshFragmenter : MonoBehaviour
         }
         if (numberOfFragments < NUMBER_OF_FRAGMENTS)
         {
-            Vector3 random1 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
-            Vector3 random2 = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+            Vector3 random1 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+            Vector3 random2 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
             Plane planeCenter = new Plane(centerOfMass, random1, random2);
 
             Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
@@ -296,6 +296,7 @@ public class MeshFragmenter : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
+        // TODO: Allow interaction of non 
         if (Initialized)
         {
             return;
