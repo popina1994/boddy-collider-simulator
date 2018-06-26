@@ -12,17 +12,17 @@ using Random = UnityEngine.Random;
 // TODO: Try to change name of namespace so it corresponds to its file path. 
 [RequireComponent(typeof(MeshFragmenter))]
 [RequireComponent(typeof(MeshFilter))]
-[RequireComponent(typeof(Rigidbody))]
 public class MeshFragmenter : MonoBehaviour
 {
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
-    private const int NUMBER_OF_FRAGMENTS = 1024;
+    private const int NUMBER_OF_FRAGMENTS = 512;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private bool _initialized = false;
     private static int _nameId = 0;
+    private static int _parentNameId = 0;
 
     private MeshTreeNode MeshTreeRoot
     {
@@ -45,6 +45,11 @@ public class MeshFragmenter : MonoBehaviour
     public static int NameId
     {
         get { return _nameId++; }
+    }
+
+    public static int ParentNameId
+    {
+        get { return _parentNameId++; }
     }
 
     private static MeshTreeNode InstantiateTreeFromMesh(Mesh mesh)
@@ -180,48 +185,6 @@ public class MeshFragmenter : MonoBehaviour
     {
     }
 
-    private static void AddThisComponentBeforeAwake(GameObject gameObject)
-    {
-        gameObject.SetActive(false);
-        gameObject.AddComponent<MeshFragmenter>();
-        gameObject.GetComponent<MeshFragmenter>().Initialized = true;
-        gameObject.SetActive(true);
-    }
-
-    private static void CreateFragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
-    {   
-        GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
-        {
-            typeof(MeshRenderer), typeof(MeshFilter), typeof(Rigidbody), typeof(MeshCollider)
-        });
-
-        MeshFilter meshFilter = gameObjectFragmentNew.GetComponent<MeshFilter>();
-        MeshRenderer meshRenderer = gameObjectFragmentNew.GetComponent<MeshRenderer>();
-        MeshCollider meshColider = gameObjectFragmentNew.GetComponent<MeshCollider>();
-        Rigidbody rigidbody = gameObjectFragmentNew.GetComponent<Rigidbody>();
-
-        rigidbody.mass = 0;
-        CombineInstance[] combine = new CombineInstance[meshTreeNodes.Count];
-        int idx = 0;
-        meshFilter.mesh = new Mesh();
-        foreach (var meshTreeNode in meshTreeNodes)
-        {
-            combine[idx].mesh = meshTreeNode.Mesh;
-            combine[idx].transform = gameObject.GetComponent<MeshFilter>().transform.localToWorldMatrix;
-            rigidbody.mass += meshTreeNode.Mass;
-            idx++;
-        }
-        meshFilter.mesh.CombineMeshes(combine);
-        rigidbody.useGravity = gameObject.GetComponent<Rigidbody>().useGravity;
-        meshColider.convex = true;
-        meshColider.sharedMesh = meshFilter.mesh;
-        
-        AddThisComponentBeforeAwake(gameObjectFragmentNew);
-
-        meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
-
-    }
-
     private static void InitMeshTreeNodes(MeshTreeNode rootTreeNode)
     {
         LinkedList<MeshTreeNode> nodesToVisit = new LinkedList<MeshTreeNode>();
@@ -292,6 +255,54 @@ public class MeshFragmenter : MonoBehaviour
         }
 
         return minimalMeshTrees;
+    }
+
+    private static void AddThisComponentBeforeAwake(GameObject gameObjectNew, GameObject gameObjectParent)
+    {
+        gameObjectNew.SetActive(false);
+        gameObjectNew.AddComponent<MeshFragmenter>();
+        gameObjectNew.GetComponent<MeshFragmenter>().Initialized = true;
+        gameObjectNew.transform.parent = gameObjectParent.transform;
+        gameObjectNew.SetActive(true);
+    }
+
+    private static void CreateFragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
+    {
+        GameObject gameObjectFragmentParent = new GameObject(ParentNameId.ToString(),
+            new Type[] {typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer)});
+        gameObjectFragmentParent.SetActive(false);
+        Rigidbody rigidbody = gameObjectFragmentParent.GetComponent<Rigidbody>();
+        MeshRenderer meshRenderer = gameObjectFragmentParent.GetComponent<MeshRenderer>();
+        MeshFilter meshFilter = gameObjectFragmentParent.GetComponent<MeshFilter>();
+
+        rigidbody.useGravity = gameObject.GetComponent<Rigidbody>().useGravity;
+        rigidbody.mass = 0;
+        CombineInstance[] combine = new CombineInstance[meshTreeNodes.Count];
+        int idx = 0;
+        meshFilter.mesh = new Mesh();
+        
+        meshRenderer.material = gameObject.GetComponent<MeshRenderer>().material;
+        foreach (var meshTreeNode in meshTreeNodes)
+        {
+            // TODO: Move initialization to one list. 
+            GameObject gameObjectFragmentNew = new GameObject(NameId.ToString(), new Type[]
+                                                    {typeof(MeshCollider)});
+            MeshCollider meshColider= gameObjectFragmentNew.GetComponent<MeshCollider>();
+
+            gameObjectFragmentNew.transform.position = gameObject.transform.position;
+            gameObjectFragmentNew.transform.localScale = gameObject.GetComponent<Transform>().localScale;
+            rigidbody.mass += meshTreeNode.Mass;
+            meshColider.sharedMesh = meshTreeNode.Mesh;
+            meshColider.convex = true;
+
+            combine[idx].mesh = meshTreeNode.Mesh;
+            combine[idx].transform = gameObject.GetComponent<MeshFilter>().transform.localToWorldMatrix;
+
+            AddThisComponentBeforeAwake(gameObjectFragmentNew, gameObjectFragmentParent);
+            idx++;
+        }
+        meshFilter.mesh.CombineMeshes(combine);
+        gameObjectFragmentParent.SetActive(true);
     }
 
     void OnCollisionEnter(Collision collision)
