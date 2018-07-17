@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using Assets.Scripts;
 using Assets.Scripts.Utility;
 using UnityEditor;
@@ -11,13 +12,13 @@ using Random = UnityEngine.Random;
 
 // TODO: Try to change name of namespace so it corresponds to its file path. 
 [RequireComponent(typeof(MeshFragmenter))]
-[RequireComponent(typeof(MeshFilter))]
 public class MeshFragmenter : MonoBehaviour
 {
     private const int POSITIVE = 0;
     private const int NEGATIVE = 1;
     private const int NUM_SIDES = 2;
-    private const int NUMBER_OF_FRAGMENTS = 512;
+    private const int NUMBER_OF_FRAGMENTS = 256;
+    private const float MAX_SPEED = 5;
     private MeshTreeNode _meshTreeRoot = null;
     private BCRBGraph _fragmentConnectivityGraph;
     private bool _initialized = false;
@@ -134,13 +135,13 @@ public class MeshFragmenter : MonoBehaviour
         meshTreeNode.Mass = MeshUpgrade.CalculateMass(meshTreeNode.Mesh);
         if (numberOfFragments == NUMBER_OF_FRAGMENTS)
         {
-            Debug.Log(String.Format("CenterOfMass{0}", centerOfMass.ToString()));
-            Debug.Log(String.Format("Mass{0}", centerOfMass.ToString()));
+            //Debug.Log(String.Format("CenterOfMass{0}", centerOfMass.ToString()));
+            //Debug.Log(String.Format("Mass{0}", centerOfMass.ToString()));
         }
         if (numberOfFragments < NUMBER_OF_FRAGMENTS)
         {
-            Vector3 random1 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
-            Vector3 random2 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
+            Vector3 random1 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), 0.5f, Random.Range(-0.5f, 0.5f));
+            Vector3 random2 = centerOfMass + new Vector3(Random.Range(-0.5f, 0.5f), 0.5f, Random.Range(-0.5f, 0.5f));
             Plane planeCenter = new Plane(centerOfMass, random1, random2);
 
             Mesh[] slicedMeshResults = SliceMesh(planeCenter, meshTreeNode.Mesh);
@@ -162,12 +163,22 @@ public class MeshFragmenter : MonoBehaviour
     // Functions that Unity uses in its execution engine. 
     void Awake()
     {
+        Stopwatch sw = new Stopwatch();
+
+        sw.Start();
+
+        // ...
+
         if (!Initialized)
         {
             LoggingUpgrade.RegisterLogFile();
             BuildMeshTree(GetComponent<MeshFilter>().mesh, 1);
             _fragmentConnectivityGraph = new BCRBGraph(MeshTreeRoot);
         }
+
+        sw.Stop();
+
+        Debug.Log(sw.Elapsed.TotalSeconds);
     }
 
     // Use this for initialization
@@ -266,7 +277,7 @@ public class MeshFragmenter : MonoBehaviour
         gameObjectNew.SetActive(true);
     }
 
-    private static void CreateFragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
+    private static GameObject CreateFragmentGameObject(GameObject gameObject, List<MeshTreeNode> meshTreeNodes)
     {
         GameObject gameObjectFragmentParent = new GameObject(ParentNameId.ToString(),
             new Type[] {typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer)});
@@ -303,35 +314,87 @@ public class MeshFragmenter : MonoBehaviour
         }
         meshFilter.mesh.CombineMeshes(combine);
         gameObjectFragmentParent.SetActive(true);
+        return gameObjectFragmentParent;
+    }
+
+    private static float GenerateImpulseComponentInRange(float component,  float range)
+    {
+        return Random.Range(component  - range, component + range);
+    }
+
+    private static Vector3 GenerateVectorImpulse(Vector3 impulse)
+    {
+        return new Vector3(GenerateImpulseComponentInRange(impulse.x, MAX_SPEED),
+                            GenerateImpulseComponentInRange(impulse.x,MAX_SPEED), 
+                           GenerateImpulseComponentInRange(impulse.x, MAX_SPEED));
+    }
+
+    public static void AddImpulseToChildren(GameObject gameObjectParent, 
+        List<GameObject> listGameObjects, Vector3 impulse)
+    {
+        float mass = gameObjectParent.GetComponent<Rigidbody>().mass;
+        Vector3 impulseSum = new Vector3();
+        var last = listGameObjects.Last();
+        foreach (var gameObject in listGameObjects)
+        {
+            Rigidbody rigidbody = gameObject.GetComponent<Rigidbody>();
+            Vector3 currentImpules = rigidbody.mass / mass * GenerateVectorImpulse(impulse);
+            impulseSum += currentImpules;
+            rigidbody.AddForce(currentImpules);
+            if (gameObject.Equals(last))
+            {
+                rigidbody.AddForce(impulse - impulseSum);
+            }
+        }
     }
 
     void OnCollisionEnter(Collision collision)
     {
-        // TODO: Allow interaction of non 
+        // TODO: Allow interaction of all components.
         if (Initialized)
         {
             return;
         }
+
+        Stopwatch sw = new Stopwatch();
+
+        sw.Start();
+
+        // ...
+
+
         ContactPoint contactPoint = collision.contacts[0];
-        float impulseIntensity = Vector3.Magnitude(
-                        this.gameObject.GetComponent<Rigidbody>().velocity * 
-                        this.gameObject.GetComponent<Rigidbody>().mass
-                        + 
-                        collision.gameObject.GetComponent<Rigidbody>().velocity * 
-                        collision.gameObject.GetComponent<Rigidbody>().mass);
+        Vector3 impulse = this.gameObject.GetComponent<Rigidbody>().velocity *
+                          this.gameObject.GetComponent<Rigidbody>().mass
+                          +
+                          collision.gameObject.GetComponent<Rigidbody>().velocity *
+                          collision.gameObject.GetComponent<Rigidbody>().mass;
+        float impulseIntensity = Vector3.Magnitude(impulse);
 
         if (_fragmentConnectivityGraph.OnCollisionDamaged(contactPoint, this.gameObject.GetComponent<Transform>(),
                                                          impulseIntensity))
         {
             this.gameObject.GetComponent<MeshCollider>().enabled = false;
             List<BCRBGraph> components = _fragmentConnectivityGraph.RecomputeConnectivity();
-            Debug.Log(String.Format("Number of components{0}", components.Count));
+            //Debug.Log(String.Format("Number of components{0}", components.Count));
+            if (components.Count <= 1)
+            {
+                return;
+            }
+            List<GameObject> listNewGameObjects = new List<GameObject>();
             foreach (var componentGraph in components)
             {
                 List<MeshTreeNode> meshTrees = GetMinimalMeshTrees(componentGraph);
-                CreateFragmentGameObject(this.gameObject, meshTrees);
+                listNewGameObjects.Add(CreateFragmentGameObject(this.gameObject, meshTrees));
             }
+
+            AddImpulseToChildren(this.gameObject, listNewGameObjects, impulse);
+
             Destroy(this.gameObject);
         }
+
+        sw.Stop();
+
+        Debug.Log("Time Collision" + sw.Elapsed.TotalSeconds);
     }
 }

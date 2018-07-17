@@ -11,6 +11,7 @@ namespace Assets.Scripts
     class BCRBGraph
     {
         private const float HIT_POINTS_MAX = 3f;
+        private const float FRAGILITY_FACTOR = 1f;
         private List<MeshTreeNode> _fragments;
 
         /// <summary>
@@ -164,7 +165,7 @@ namespace Assets.Scripts
                     Vector3 edgePosition = (transform.TransformPoint(Fragments[idx].CenterOfMass) + 
                                             transform.TransformPoint(edge.Fragment.CenterOfMass)) / 2;
                     s = Vector3.Distance(edgePosition, contactPoint.point);
-                    damage = impulseIntensity / (s * s * s);
+                    damage = FRAGILITY_FACTOR * impulseIntensity / (s * s * s);
                     edge.Damage(damage);
                     //edge.Damage(HIT_POINTS_MAX);
                     

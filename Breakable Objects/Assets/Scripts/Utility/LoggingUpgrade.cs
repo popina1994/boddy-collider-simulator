@@ -21,7 +21,7 @@ namespace Assets.Scripts.Utility
 
         public static void RegisterLogFile()
         {
-            Debug.unityLogger.logEnabled = false;
+            //Debug.unityLogger.logEnabled = false;
             Application.logMessageReceived += HandleLog;
             File.WriteAllText(FILE_NAME, String.Empty);
         }
